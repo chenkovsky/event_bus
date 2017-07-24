@@ -8,8 +8,10 @@ class EventBus
     include Singleton
 
     def announce(event_name, payload)
+      event_name = event_name.to_sym
       full_payload = {event_name: event_name}.merge(payload)
-      listeners.each do |listener|
+      return unless listeners.key? event_name
+      listeners[event_name].each do |listener|
         pass_event_to listener, event_name, full_payload
       end
     end
@@ -19,11 +21,13 @@ class EventBus
     end
 
     def add_method(pattern, listener, method_name)
-      listeners << Registration.new(pattern, listener, method_name)
+      pattern = pattern.to_sym
+      add_listeners pattern, Registration.new(pattern, listener, method_name)
     end
 
     def add_block(pattern, &blk)
-      listeners << BlockRegistration.new(pattern, blk)
+      pattern = pattern.to_sym
+      add_listeners pattern, BlockRegistration.new(pattern, blk)
     end
 
     def on_error(&blk)
@@ -31,16 +35,34 @@ class EventBus
     end
 
     def remove_subscriber(subscriber)
-      listeners.delete subscriber
+      return unless subscriber.is_a?(Registration) ||
+                    subscriber.is_a?(BlockRegistration)
+      return unless listeners.key?(subscriber.pattern)
+      arr = listeners[subscriber.pattern]
+      arr.delete subscriber
+      listeners.delete subscriber.pattern if arr.empty?
     end
 
-    def last_subscriber
-      listeners.last
+    def remove_event(event_name)
+      listeners.delete event_name
+    end
+
+    def last_subscriber(event_name)
+      return nil unless listeners.key? event_name
+      arr = listeners[event_name]
+      return nil if arr.empty?
+      arr[-1]
     end
 
     private
+
     def listeners
-      @listeners ||= []
+      @listeners ||= {}
+    end
+
+    def add_listeners(pattern, registration)
+      listeners[pattern] ||= []
+      listeners[pattern] << registration
     end
 
     def error_handler

@@ -33,14 +33,14 @@ class EventBus
     # If +blk+ is supplied, it will be called with any event whose name
     # matches +pattern+.
     #
-    # If no block is given, and if +pattern+ is a String or a Regexp,
+    # If no block is given, and if +pattern+ is a String,
     # a method will be called on +listener+ whenever an event matching
     # +pattern+ occurs. In this case, if +method_name+ is supplied the
     # EventBus will look for, and call, a method of that name on +listener+;
     # otherwise if +method_name+ is not given, the EventBus will attempt to
     # call a method whose name matches the event's name.
     #
-    # Finally, if no block is given and +pattern+ is not a String or a Regexp,
+    # Finally, if no block is given and +pattern+ is not a String,
     # then +pattern+ is taken to be a listener object and the EventBus will
     # attempt to call a method on it whose name matches the event's name.
     #
@@ -49,19 +49,17 @@ class EventBus
     # When a matching event occurs, either the block is called or the +method_name+
     # method on the +listener+ object is called.
     #
-    # @param pattern [String, Regexp] listen for any events whose name matches this pattern
+    # @param pattern [String] listen for any events whose name matches this pattern
     # @param listener the object to be notified when a matching event occurs
     # @param method_name [Symbol] the method to be called on +listener+ when a matching event occurs
     # @return [EventBus] the EventBus, ready to be called again.
     #
     def subscribe(pattern, listener = nil, method_name = nil, &blk)
       case pattern
-      when Regexp, String, Symbol
+      when String, Symbol
         subscribe_pattern(pattern, listener, method_name, &blk)
       else
-        raise ArgumentError.new('You cannot give two listeners') if listener || method_name
-        raise ArgumentError.new('You cannot give both a listener and a block') if block_given?
-        subscribe_obj(pattern)
+        raise ArgumentError.new('pattern can only be String or Symbol')
       end
       self
     end
@@ -98,13 +96,13 @@ class EventBus
     # Adds a subscriber that only listens for the duration of the block. Mostly
     # useful for testing event dispatching.
     #
-    # @param pattern [String, Regexp] listen for any events whose name matches this pattern
+    # @param pattern [String] listen for any events whose name matches this pattern
     # @param listener the object to be notified when a matching event occurs
     # @param method_name [Symbol] the method to be called on +listener+ when a matching event occurs
     # @return [EventBus] the EventBus, ready to be called again.
     def with_temporary_subscriber(pattern, listener = nil, method_name = nil)
       subscribe(pattern, listener, method_name)
-      temporary_subscriber = registrations.last_subscriber
+      temporary_subscriber = registrations.last_subscriber pattern
 
       yield
 
@@ -123,13 +121,6 @@ class EventBus
       else
         raise ArgumentError.new('You must provide a listener or a block') unless block_given?
         registrations.add_block(pattern, &blk)
-      end
-    end
-
-    def subscribe_obj(listener)
-      registrations.add_block(/.*/) do |payload|
-        method = payload[:event_name].to_sym
-        listener.send(method, payload) if listener.respond_to?(method)
       end
     end
 
